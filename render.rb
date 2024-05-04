@@ -12,6 +12,9 @@ end
 ActiveRecord::Base.establish_connection(adapter: "sqlite3", database: ":memory:")
 Arel::Table.engine = ActiveRecord::Base
 
+original_stdout = $stdout
+$stdout = File.new("/dev/null", "w")
+
 class Constant < ActiveRecord::Base
   self.table_name = :constants
 end
@@ -46,6 +49,7 @@ ActiveRecord::Schema.define do
     t.float :radius
   end
 end
+$stdout = original_stdout
 
 def let(name, value)
   Constant.create!(name:, value:)
@@ -93,14 +97,38 @@ recursive_term
   .project(0, 0)
   .union(Arel::SelectManager.new.from(numbers).project(1, 2))
 
-#manager = Arel::SelectManager.new
+manager = Arel::SelectManager.new
+manager.project(Arel.sql("1"))
 #manager.with(:recursive).as(recursive_term).from(:final).project(Arel.star)
 #puts manager.to_sql
 
-puts "P3"
-puts ActiveRecord::Base.connection.select_value(Arel::SelectManager.new.project(Arel::Nodes::NamedFunction.new("PRINTF", [Arel.sql('"%i %i"'), get(:width).to_i, get(:height).to_i])).to_sql
-)
+cte_def = Arel::Nodes::NamedFunction.new("numbers", [Arel.sql("n")])
+as_stmt = Arel::Nodes::As.new cte_def, Arel.sql("foo")
+select_manager = Arel::SelectManager.new
+puts select_manager.with(as_stmt).to_sql
 
-#puts ActiveRecord::Base.connection.execute(Arel::SelectManager.new.project('PRINTF("P3")').to_sql)
-#puts Arel::SelectManager.new.project("hi").to_sql
-#puts ActiveRecord::Base.connection.execute(Arel::SelectManager.new.project("hi").to_sql)
+
+
+puts "P3"
+puts ActiveRecord::Base.connection.select_value(Arel::SelectManager.new.project(Arel::Nodes::NamedFunction.new("PRINTF", [Arel.sql('"%i %i"'), get(:width).to_i, get(:height).to_i])))
+puts 255
+
+#puts ActiveRecord::Base.connection.select_value(Arel.sql("WITH RECURSIVE foo(n) AS (SELECT 1 UNION ALL SELECT ('foo'.'n' + 1) FROM foo WHERE 'foo'.'n' < 10) SELECT GROUP_CONCAT(PRINTF('number: %i', n), ', ') FROM foo;"))
+
+cte_def = Arel::Nodes::NamedFunction.new("numbers", [Arel.sql("n")])
+cte_def.define_singleton_method(:name) do
+  Arel.sql("numbers(n)")
+end
+
+union = manager.union(:all, numbers.project(numbers[:n] + 1).where(numbers[:n].lt(10)))
+
+as_statement = Arel::Nodes::As.new cte_def, union
+puts "as stmt", as_statement.to_sql
+#File.write("as.dot", Arel::SelectManager.new.with(as_statement).to_dot)
+printf = Arel::Nodes::NamedFunction.new("PRINTF", [Arel.sql('"number: %i"'), numbers[:n]])
+group_concat = Arel::Nodes::NamedFunction.new('GROUP_CONCAT', [printf, Arel.sql('", "')])
+
+f = Arel::SelectManager.new.with(:recursive, as_statement).from(numbers).project(group_concat)
+puts f.to_sql
+puts ActiveRecord::Base.connection.select_value(f)
+
