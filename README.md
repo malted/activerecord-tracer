@@ -53,8 +53,8 @@ cte_def.define_singleton_method(:name) do
     Arel.sql("numbers(n)")
 end
 ```
-![dot sql recursion example diagram](res/recursion.png)
-<!-- dot recursion.dot -T png -o recursion.png -->
+![dot sql recursion example diagram](res/recursion.svg)
+<!-- dot recursion.dot -T svg -o recursion.svg -->
 
 
 
