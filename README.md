@@ -1,3 +1,4 @@
+```sql
 sqlite> WITH RECURSIVE foo(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM foo LIMIT 10) SELECT n FROM foo;
 1
 2
@@ -9,9 +10,11 @@ sqlite> WITH RECURSIVE foo(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM foo LIMIT
 8
 9
 10
-
-WITH RECURSIVE foo(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM foo LIMIT 10) SELECT GROUP_CONCAT(PRINTF("number: %i", n), ', ') AS RES FROM foo;
+```
+```sql
+sqlite> WITH RECURSIVE foo(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM foo LIMIT 10) SELECT GROUP_CONCAT(PRINTF("number: %i", n), ', ') AS RES FROM foo;
 number: 1, number: 2, number: 3, number: 4, number: 5, number: 6, number: 7, number: 8, number: 9, number: 10
+```
 
 ### The breakdown of `Arel::Nodes::NamedFunction`s
 As far as I know, Arel does not support defining common table expressions with explicit columns.
