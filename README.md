@@ -1,6 +1,8 @@
 # Raytraced rendering in ActiveRecord
 ![Render output](res/out.png)
 
+###### The output of `render.rb`, rendered in about half a second.
+
 ## Explanation
 
 In order to generate so many pixel values, we're going to use a quite uncommon SQL construct called a recursive common table expression.
