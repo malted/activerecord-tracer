@@ -65,7 +65,7 @@ end
 
 # Image
 let :aspect_ratio, 16.0/9.0
-let :width, 400
+let :width, 800
 let :height, get(:width) / get(:aspect_ratio)
 
 # Camera
@@ -98,36 +98,41 @@ recursive_term
   .union(Arel::SelectManager.new.from(numbers).project(1, 2))
 
 manager = Arel::SelectManager.new
-manager.project(Arel.sql("1"))
+manager.project(Arel.sql("0"), Arel.sql("0"))
 #manager.with(:recursive).as(recursive_term).from(:final).project(Arel.star)
 #puts manager.to_sql
-
-cte_def = Arel::Nodes::NamedFunction.new("numbers", [Arel.sql("n")])
-as_stmt = Arel::Nodes::As.new cte_def, Arel.sql("foo")
-select_manager = Arel::SelectManager.new
-puts select_manager.with(as_stmt).to_sql
-
-
 
 puts "P3"
 puts ActiveRecord::Base.connection.select_value(Arel::SelectManager.new.project(Arel::Nodes::NamedFunction.new("PRINTF", [Arel.sql('"%i %i"'), get(:width).to_i, get(:height).to_i])))
 puts 255
 
-#puts ActiveRecord::Base.connection.select_value(Arel.sql("WITH RECURSIVE foo(n) AS (SELECT 1 UNION ALL SELECT ('foo'.'n' + 1) FROM foo WHERE 'foo'.'n' < 10) SELECT GROUP_CONCAT(PRINTF('number: %i', n), ', ') FROM foo;"))
-
-cte_def = Arel::Nodes::NamedFunction.new("numbers", [Arel.sql("n")])
+cte_def = Arel::Nodes::NamedFunction.new("numbers", [Arel.sql("x"), Arel.sql("y")])
 cte_def.define_singleton_method(:name) do
-  Arel.sql("numbers(n)")
+  Arel.sql("numbers(x, y)")
 end
 
-union = manager.union(:all, numbers.project(numbers[:n] + 1).where(numbers[:n].lt(10)))
+mod = Arel::Nodes::NamedFunction.new("MOD", [numbers[:x] + 1, Arel.sql(get(:width).to_s)])
+cas = Arel::Nodes::Case.new().when(numbers[:x].eq(get(:width) - 1)).then(1).else(0)
+union = manager.union(:all, numbers.project(mod, numbers[:y] + cas).where(numbers[:y].lt(get(:height))))
 
 as_statement = Arel::Nodes::As.new cte_def, union
-puts "as stmt", as_statement.to_sql
-printf = Arel::Nodes::NamedFunction.new("PRINTF", [Arel.sql('"number: %i"'), numbers[:n]])
-group_concat = Arel::Nodes::NamedFunction.new('GROUP_CONCAT', [printf, Arel.sql('", "')])
+printf = Arel::Nodes::NamedFunction.new("PRINTF", [
+  Arel.sql('"%i %i %i"'),
+  (numbers[:x] / Arel.sql((get(:width) - 1).to_s) * 255),
+  (numbers[:y] / Arel.sql((get(:height) - 1).to_s) * 255),
+  255
+])
+group_concat = Arel::Nodes::NamedFunction.new('GROUP_CONCAT', [printf, Arel.sql('"
+"')])
+
+#colours = Arel::Table.new(:colours)
+#colours_manager = Arel::SelectManager.new
+#colours_manager.project(Arel.sql("0"), Arel.sql("0"), Arel.sql("0"))
+#colours_cte_def = Struct.new(:name).new("colours(r, g, b)")
+
+
 
 f = Arel::SelectManager.new.with(:recursive, as_statement).from(numbers).project(group_concat)
-puts f.to_sql
+puts "# " + f.to_sql
 puts ActiveRecord::Base.connection.select_value(f)
 File.write("res/recursion.dot", f.to_dot)
