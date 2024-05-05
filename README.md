@@ -1,7 +1,8 @@
 ## Running
 ```bash
-ruby render.rb > res/out.png && open res/out.png
+ruby render.rb > res/out.ppm && convert res/out.ppm res/out.png && open res/out.png
 ```
+![Render output](res/out.png)
 
 In order to generate so many pixel values, we're going to use a quite uncommon SQL construct called a recursive common table expression.
 A common table expression (CTE) is created with the `WITH` keyword, and is used for creating temporary named result sets. This lets you break down big queries into smaller chunks, giving you intermediary tables in a virtual table, so you don't have to `CREATE TABLE`, calculate stuff, then `DROP TABLE`. `WITH RECURSIVE` does this too, but uses its own table data again and again until there are no more rows (ie some condition is met).
