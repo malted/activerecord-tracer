@@ -118,8 +118,8 @@ union = manager.union(:all, numbers.project(mod, numbers[:y] + cas).where(number
 as_statement = Arel::Nodes::As.new cte_def, union
 printf = Arel::Nodes::NamedFunction.new("PRINTF", [
   Arel.sql('"%i %i %i"'),
-  (numbers[:x] / Arel.sql((get(:width) - 1).to_s) * 255),
-  (numbers[:y] / Arel.sql((get(:height) - 1).to_s) * 255),
+  (numbers[:x] / Arel.sql((get(:width) - 1).to_s) * 254),
+  (numbers[:y] / Arel.sql((get(:height) - 1).to_s) * 254),
   255
 ])
 group_concat = Arel::Nodes::NamedFunction.new('GROUP_CONCAT', [printf, Arel.sql('"
@@ -133,6 +133,6 @@ group_concat = Arel::Nodes::NamedFunction.new('GROUP_CONCAT', [printf, Arel.sql(
 
 
 f = Arel::SelectManager.new.with(:recursive, as_statement).from(numbers).project(group_concat)
-puts "# " + f.to_sql
+#puts "#" + f.to_sql
 puts ActiveRecord::Base.connection.select_value(f)
 File.write("res/recursion.dot", f.to_dot)
