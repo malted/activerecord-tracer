@@ -1,4 +1,4 @@
-# Raytracing in ActiveRecord
+# Raytraced rendering in ActiveRecord
 ![Render output](res/out.png)
 
 ## Explanation
