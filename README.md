@@ -114,3 +114,7 @@ end
 
 ### Sources
 https://stackoverflow.com/q/57613637/10652680
+https://jpospisil.com/2014/06/16/the-definitive-guide-to-arel-the-sql-manager-for-ruby
+https://rubydoc.info/gems/arel/
+The ActiveRecord Github repo, especially the tests!
+
