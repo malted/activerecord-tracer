@@ -135,4 +135,4 @@ group_concat = Arel::Nodes::NamedFunction.new('GROUP_CONCAT', [printf, Arel.sql(
 f = Arel::SelectManager.new.with(:recursive, as_statement).from(numbers).project(group_concat)
 #puts "#" + f.to_sql
 puts ActiveRecord::Base.connection.select_value(f)
-wile.write("res/ast.dot", f.to_dot)
+File.write("res/ast.dot", f.to_dot)
