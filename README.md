@@ -1,6 +1,6 @@
 ## Running
 ```bash
-ruby render.rb > res/out.ppm && convert res/out.ppm res/out.png && open res/out.png
+./run.sh
 ```
 ![Render output](res/out.png)
 
