@@ -65,7 +65,7 @@ end
 
 # Image
 let :aspect_ratio, 16.0/9.0
-let :width, 100
+let :width, 400
 let :height, get(:width) / get(:aspect_ratio)
 
 # Camera
