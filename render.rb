@@ -89,22 +89,13 @@ Vector3.create!(
 
 Sphere.create!(name: :big_sphere, position: Vector3.create!(x: 0.0, y: 0.0, z: -1.0), radius: 0.5)
 
-numbers = Arel::Table.new(:numbers)
-
-recursive_term = Arel::SelectManager.new
-recursive_term
-  .from(numbers)
-  .project(0, 0)
-  .union(Arel::SelectManager.new.from(numbers).project(1, 2))
-
-manager = Arel::SelectManager.new
-manager.project(Arel.sql("0"), Arel.sql("0"))
-#manager.with(:recursive).as(recursive_term).from(:final).project(Arel.star)
-#puts manager.to_sql
 
 puts "P3"
 puts ActiveRecord::Base.connection.select_value(Arel::SelectManager.new.project(Arel::Nodes::NamedFunction.new("PRINTF", [Arel.sql('"%i %i"'), get(:width).to_i, get(:height).to_i])))
 puts 255
+
+numbers = Arel::Table.new(:numbers)
+manager = Arel::SelectManager.new.project(Arel.sql("0"), Arel.sql("0"))
 
 cte_def = Arel::Nodes::NamedFunction.new("numbers", [Arel.sql("x"), Arel.sql("y")])
 cte_def.define_singleton_method(:name) do
@@ -116,23 +107,39 @@ cas = Arel::Nodes::Case.new().when(numbers[:x].eq(get(:width) - 1)).then(1).else
 union = manager.union(:all, numbers.project(mod, numbers[:y] + cas).where(numbers[:y].lt(get(:height))))
 
 as_statement = Arel::Nodes::As.new cte_def, union
+
+# UVs
+uvs = Arel::Table::new(:uvs)
+uvs_manager = numbers.project(
+  numbers[:x],
+  numbers[:y],
+  numbers[:x] / Arel.sql((get(:width) - 1).to_s), 
+  (Arel::Nodes::Subtraction.new(1, numbers[:y])) / Arel.sql((get(:height) - 1).to_s)
+)
+
+uvs_cte_def = Arel::Nodes::NamedFunction.new("uvs", [Arel.sql("x"), Arel.sql("y"), Arel.sql("u"), Arel.sql("v")])
+uvs_cte_def.define_singleton_method(:name) do
+  Arel.sql("uvs(x, y, u, v)")
+end
+uvs_as_stmt = Arel::Nodes::As.new uvs_cte_def, uvs_manager
+
 printf = Arel::Nodes::NamedFunction.new("PRINTF", [
   Arel.sql('"%i %i %i"'),
-  (numbers[:x] / Arel.sql((get(:width) - 1).to_s) * 255),
-  (numbers[:y] / Arel.sql((get(:height) - 1).to_s) * 255),
+  #(uvs[:x] / Arel.sql((get(:width) - 1).to_s) * 255),
+  (uvs[:u] * 255),
+  #(uvs[:y] / Arel.sql((get(:height) - 1).to_s) * 255),
+  (uvs[:v] * 255),
   255
 ])
-group_concat = Arel::Nodes::NamedFunction.new('GROUP_CONCAT', [printf, Arel.sql('"
-"')])
+group_concat = Arel::Nodes::NamedFunction.new('GROUP_CONCAT', [printf, Arel.sql('" "')])
 
 #colours = Arel::Table.new(:colours)
 #colours_manager = Arel::SelectManager.new
 #colours_manager.project(Arel.sql("0"), Arel.sql("0"), Arel.sql("0"))
 #colours_cte_def = Struct.new(:name).new("colours(r, g, b)")
 
-
-
-f = Arel::SelectManager.new.with(:recursive, as_statement).from(numbers).project(group_concat)
-#puts "#" + f.to_sql
+f = Arel::SelectManager.new.with(:recursive, as_statement, uvs_as_stmt).from(uvs).project(group_concat)
+puts "# " + f.to_sql
 puts ActiveRecord::Base.connection.select_value(f)
-File.write("res/_ast.dot", f.to_dot)
+#File.write("res/_ast.dot", f.to_dot)
+
