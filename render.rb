@@ -87,7 +87,7 @@ Vector3.create!(
   z: Vector3.find_by(name: :origin).z - Vector3.find_by(name: :horizontal).z / 2.0 - Vector3.find_by(name: :vertical).z / 2.0 - get(:focal_length)
 )
 
-Sphere.create!(name: :big_sphere, position: Vector3.create!(x: 0.0, y: 0.0, z: -1.0), radius: 0.5)
+Sphere.create!(name: :big_sphere, position: Vector3.create!(x: 0.0, y: 0.0, z: 2.0), radius: 1.0)
 
 
 puts "P3"
@@ -211,24 +211,70 @@ hits_raw_manager = rays_unit.project(
     Arel.sql("hc")
   )
 )
+hits_raw_cte_def = Arel::Nodes::NamedFunction.new("hits_raw", [])
+hits_raw_cte_def.define_singleton_method(:name) do
+  Arel.sql("hits_raw")
+end
+hits_raw_as_stmt = Arel::Nodes::As.new hits_raw_cte_def, hits_raw_manager
 
-t = Arel::Nodes::Multiplication.new Arel.sql("0.5"), rays_unit[:dy] + Arel.sql("1.0")
+hits = Arel::Table.new(:hits)
+hits_manager = hits_raw.project(
+  hits_raw[:x], hits_raw[:y],
+  hits_raw[:ox], hits_raw[:oy], hits_raw[:oz],
+  hits_raw[:dx], hits_raw[:dy], hits_raw[:dz],
+  hits_raw[:ndx], hits_raw[:ndy], hits_raw[:ndz],
+  Arel::Nodes::As.new(
+    Arel.sql("CASE WHEN POW(hits_raw.hb, 2) - 4.0 * hits_raw.ha * hits_raw.hc < 0 THEN -1.0 ELSE ((-1.0 * hits_raw.hb) - SQRT(POW(hits_raw.hb, 2) - 4.0 * hits_raw.ha * hits_raw.hc)) / (2.0 * hits_raw.ha) END"),
+    Arel.sql("h")
+  )
+)
+hits_cte_def = Arel::Nodes::NamedFunction.new("hits", [])
+hits_cte_def.define_singleton_method(:name) do
+  Arel.sql("hits")
+end
+hits_as_stmt = Arel::Nodes::As.new hits_cte_def, hits_manager
+
+colours = Arel::Table.new(:colours)
+colours_manager = hits.project(
+  hits[:x], hits[:y], hits[:h],
+  Arel::Nodes::As.new(
+    Arel::Nodes::Case.new()
+      .when(hits[:h].gt(Arel.sql("0.0")))
+      .then(Arel.sql("0.5 * ((dx / SQRT(POW(ox + h * dx, 2) + POW(oy + h * dy, 2) + (POW(oz + h * dz, 2)))) + 1)"))
+      .else(Arel.sql("((1.0 - 0.5 * (ndy + 1.0)) + 0.5 * (ndy + 1.0) * 0.5)")),
+  Arel.sql("r")
+  ),
+  Arel::Nodes::As.new(
+    Arel::Nodes::Case.new()
+      .when(hits[:h].gt(0.0))
+      .then(Arel.sql("0.5 * ((dy / SQRT(POW(ox + h * dx, 2) + POW(oy + h * dy, 2) + (POW(oz + h * dz, 2)))) + 1)"))
+      .else(Arel.sql("((1.0 - 0.5 * (ndy + 1.0)) + 0.5 * (ndy + 1.0) * 0.7)")),
+    Arel.sql("g")
+  ),
+  Arel::Nodes::As.new(
+    Arel::Nodes::Case.new()
+      .when(hits[:h].gt(0.0))
+      .then(Arel.sql("0.5 * (dz / SQRT(POW(ox + h * dx, 2) + POW(oy + h * dy, 2) + (POW(oz + h * dz, 2))))"))
+      .else(1.0),
+    Arel.sql("b")
+  )
+)
+colours_cte_def = Arel::Nodes::NamedFunction.new("colours", [])
+colours_cte_def.define_singleton_method(:name) do
+  Arel.sql("colours")
+end
+colours_as_stmt = Arel::Nodes::As.new colours_cte_def, colours_manager
 
 printf = Arel::Nodes::NamedFunction.new("PRINTF", [
   Arel.sql('"%i %i %i"'),
-  (Arel::Nodes::Subtraction.new(Arel.sql("1.0"), t) + t * Arel.sql("0.5")) * 255,
-  (Arel::Nodes::Subtraction.new(Arel.sql("1.0"), t) + t * Arel.sql("0.7")) * 255,
-  (Arel::Nodes::Subtraction.new(Arel.sql("1.0"), t) + t * Arel.sql("1.0")) * 255,
+  colours[:r] * 255,
+  colours[:g] * 255,
+  colours[:b] * 255
 ])
 group_concat = Arel::Nodes::NamedFunction.new('GROUP_CONCAT', [printf, Arel.sql('"
 "')])
 
-#colours = Arel::Table.new(:colours)
-#colours_manager = Arel::SelectManager.new
-#colours_manager.project(Arel.sql("0"), Arel.sql("0"), Arel.sql("0"))
-#colours_cte_def = Struct.new(:name).new("colours(r, g, b)")
-
-f = Arel::SelectManager.new.with(:recursive, as_statement, uvs_as_stmt, rays_as_stmt, rays_unit_as_stmt).from(rays_unit).project(group_concat)
+f = Arel::SelectManager.new.with(:recursive, as_statement, uvs_as_stmt, rays_as_stmt, rays_unit_as_stmt, hits_raw_as_stmt, hits_as_stmt, colours_as_stmt).from(colours).project(group_concat)
 #puts "# " + f.to_sql
 puts ActiveRecord::Base.connection.select_value(f)
 #File.write("res/_ast.dot", f.to_dot)
