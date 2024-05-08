@@ -123,23 +123,82 @@ uvs_cte_def.define_singleton_method(:name) do
 end
 uvs_as_stmt = Arel::Nodes::As.new uvs_cte_def, uvs_manager
 
+# Rays
+rays = Arel::Table::new(:rays)
+rays_manager = uvs.project(
+  uvs[:x],
+  uvs[:y],
+  Arel.sql(Vector3.find_by(name: :origin).x.to_s),
+  Arel.sql(Vector3.find_by(name: :origin).y.to_s),
+  Arel.sql(Vector3.find_by(name: :origin).z.to_s),
+
+  Arel::Nodes::Addition.new(
+    uvs[:u] * Arel.sql(Vector3.find_by(name: :horizontal).x.to_s),
+    uvs[:v] * Arel.sql(Vector3.find_by(name: :vertical).x.to_s)       
+  ) +
+  Arel.sql(Vector3.find_by(name: :corner_bottom_left).x.to_s) -
+  Arel.sql(Vector3.find_by(name: :corner_bottom_left).x.to_s),
+
+  Arel::Nodes::Addition.new(
+    uvs[:u] * Arel.sql(Vector3.find_by(name: :horizontal).y.to_s),
+    uvs[:v] * Arel.sql(Vector3.find_by(name: :vertical).y.to_s)       
+  ) +
+  Arel.sql(Vector3.find_by(name: :corner_bottom_left).y.to_s) -
+  Arel.sql(Vector3.find_by(name: :corner_bottom_left).y.to_s),
+
+  Arel::Nodes::Addition.new(
+    uvs[:u] * Arel.sql(Vector3.find_by(name: :horizontal).z.to_s),
+    uvs[:v] * Arel.sql(Vector3.find_by(name: :vertical).z.to_s)       
+  ) +
+  Arel.sql(Vector3.find_by(name: :corner_bottom_left).z.to_s) -
+  Arel.sql(Vector3.find_by(name: :corner_bottom_left).z.to_s),
+)
+rays_cte_def = Arel::Nodes::NamedFunction.new("rays", [Arel.sql("x"), Arel.sql("y"), Arel.sql("ox"), Arel.sql("oy"), Arel.sql("oz"), Arel.sql("dx"), Arel.sql("dy"), Arel.sql("dz")])
+rays_cte_def.define_singleton_method(:name) do
+  Arel.sql("rays(x, y, ox, oy, oz, dx, dy, dz)")
+end
+rays_as_stmt = Arel::Nodes::As.new rays_cte_def, rays_manager
+
+rays_unit = Arel::Table.new(:rays_unit)
+rays_unit_manager_pow_x = Arel::Nodes::NamedFunction.new("POW", [rays[:dx], Arel.sql("2")])
+rays_unit_manager_pow_y = Arel::Nodes::NamedFunction.new("POW", [rays[:dy], Arel.sql("2")])
+rays_unit_manager_pow_z = Arel::Nodes::NamedFunction.new("POW", [rays[:dz], Arel.sql("2")])
+rays_unit_manager_sqrt_function = Arel::Nodes::NamedFunction.new(
+  "SQRT",
+  [rays_unit_manager_pow_x + rays_unit_manager_pow_y + rays_unit_manager_pow_z]
+)
+rays_unit_manager = rays.project(
+  rays[:x], rays[:y],
+  rays[:ox], rays[:oy], rays[:oz],
+  rays[:dx], rays[:dy], rays[:dz],
+  Arel::Nodes::Division.new(rays[:dx], rays_unit_manager_sqrt_function),
+  Arel::Nodes::Division.new(rays[:dy], rays_unit_manager_sqrt_function),
+  Arel::Nodes::Division.new(rays[:dz], rays_unit_manager_sqrt_function),
+)
+rays_unit_cte_def = Arel::Nodes::NamedFunction.new("rays_unit", [Arel.sql("x"), Arel.sql("y"), Arel.sql("ox"), Arel.sql("oy"), Arel.sql("oz"), Arel.sql("dx"), Arel.sql("dy"), Arel.sql("dz"), Arel.sql("ndx"), Arel.sql("ndy"), Arel.sql("ndz")])
+rays_unit_cte_def.define_singleton_method(:name) do
+  Arel.sql("rays_unit(x, y, ox, oy, oz, dx, dy, dz, ndx, ndy, ndz)")
+end
+rays_unit_as_stmt = Arel::Nodes::As.new rays_unit_cte_def, rays_unit_manager
+
+t = Arel::Nodes::Multiplication.new Arel.sql("0.5"),rays_unit[:dy] + Arel.sql("1.0")
+
 printf = Arel::Nodes::NamedFunction.new("PRINTF", [
   Arel.sql('"%i %i %i"'),
-  #(uvs[:x] / Arel.sql((get(:width) - 1).to_s) * 255),
-  (uvs[:u] * 255),
-  #(uvs[:y] / Arel.sql((get(:height) - 1).to_s) * 255),
-  (uvs[:v] * 255),
-  255
+  (Arel::Nodes::Subtraction.new(Arel.sql("1.0"), t) + t * Arel.sql("0.5")) * 255,
+  (Arel::Nodes::Subtraction.new(Arel.sql("1.0"), t) + t * Arel.sql("0.7")) * 255,
+  (Arel::Nodes::Subtraction.new(Arel.sql("1.0"), t) + t * Arel.sql("1.0")) * 255,
 ])
-group_concat = Arel::Nodes::NamedFunction.new('GROUP_CONCAT', [printf, Arel.sql('" "')])
+group_concat = Arel::Nodes::NamedFunction.new('GROUP_CONCAT', [printf, Arel.sql('"
+"')])
 
 #colours = Arel::Table.new(:colours)
 #colours_manager = Arel::SelectManager.new
 #colours_manager.project(Arel.sql("0"), Arel.sql("0"), Arel.sql("0"))
 #colours_cte_def = Struct.new(:name).new("colours(r, g, b)")
 
-f = Arel::SelectManager.new.with(:recursive, as_statement, uvs_as_stmt).from(uvs).project(group_concat)
-puts "# " + f.to_sql
+f = Arel::SelectManager.new.with(:recursive, as_statement, uvs_as_stmt, rays_as_stmt, rays_unit_as_stmt).from(rays_unit).project(group_concat)
+#puts "# " + f.to_sql
 puts ActiveRecord::Base.connection.select_value(f)
 #File.write("res/_ast.dot", f.to_dot)
 
