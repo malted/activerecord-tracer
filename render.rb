@@ -181,6 +181,22 @@ rays_unit_cte_def.define_singleton_method(:name) do
 end
 rays_unit_as_stmt = Arel::Nodes::As.new rays_unit_cte_def, rays_unit_manager
 
+hits_raw = Arel::Table.new(:hits_raw)
+hits_raw_manager_pow_x = Arel::Nodes::NamedFunction.new("POW", [rays_unit[:dx], Arel.sql("2")])
+hits_raw_manager_pow_y = Arel::Nodes::NamedFunction.new("POW", [rays_unit[:dy], Arel.sql("2")])
+hits_raw_manager_pow_z = Arel::Nodes::NamedFunction.new("POW", [rays_unit[:dz], Arel.sql("2")])
+
+hits_raw_manager = rays_unit_manager.project(
+  rays_unit[:x], rays_unit[:y],
+  rays_unit[:ox], rays_unit[:oy], rays_unit[:oz],
+  rays_unit[:dx], rays_unit[:dy], rays_unit[:dz],
+  rays_unit[:ndx], rays_unit[:ndy], rays_unit[:ndz],
+  
+  Arel::Nodes::As.new(hits_raw_manager_pow_x + hits_raw_manager_pow_y + hits_raw_manager_pow_z, Arel.sql("ha")),
+
+)
+
+
 t = Arel::Nodes::Multiplication.new Arel.sql("0.5"),rays_unit[:dy] + Arel.sql("1.0")
 
 printf = Arel::Nodes::NamedFunction.new("PRINTF", [
