@@ -182,22 +182,37 @@ end
 rays_unit_as_stmt = Arel::Nodes::As.new rays_unit_cte_def, rays_unit_manager
 
 hits_raw = Arel::Table.new(:hits_raw)
-hits_raw_manager_pow_x = Arel::Nodes::NamedFunction.new("POW", [rays_unit[:dx], Arel.sql("2")])
-hits_raw_manager_pow_y = Arel::Nodes::NamedFunction.new("POW", [rays_unit[:dy], Arel.sql("2")])
-hits_raw_manager_pow_z = Arel::Nodes::NamedFunction.new("POW", [rays_unit[:dz], Arel.sql("2")])
-
-hits_raw_manager = rays_unit_manager.project(
+hits_raw_manager_pow_x_ha = Arel::Nodes::NamedFunction.new("POW", [rays_unit[:dx], Arel.sql("2")])
+hits_raw_manager_pow_y_ha = Arel::Nodes::NamedFunction.new("POW", [rays_unit[:dy], Arel.sql("2")])
+hits_raw_manager_pow_z_ha = Arel::Nodes::NamedFunction.new("POW", [rays_unit[:dz], Arel.sql("2")])
+hits_raw_manager_pow_x_hc = Arel::Nodes::NamedFunction.new("POW", [rays_unit[:ox] - Arel.sql(Sphere.find_by(name: :big_sphere).position.x.to_s), Arel.sql("2")]) 
+hits_raw_manager_pow_y_hc = Arel::Nodes::NamedFunction.new("POW", [rays_unit[:oy] - Arel.sql(Sphere.find_by(name: :big_sphere).position.y.to_s), Arel.sql("2")]) 
+hits_raw_manager_pow_z_hc = Arel::Nodes::NamedFunction.new("POW", [rays_unit[:oz] - Arel.sql(Sphere.find_by(name: :big_sphere).position.z.to_s), Arel.sql("2")]) 
+hits_raw_manager_pow_radius_hc = Arel::Nodes::NamedFunction.new("POW", [Arel.sql(Sphere.find_by(name: :big_sphere).radius.to_s), Arel.sql("2")]) 
+hits_raw_manager = rays_unit.project(
   rays_unit[:x], rays_unit[:y],
   rays_unit[:ox], rays_unit[:oy], rays_unit[:oz],
   rays_unit[:dx], rays_unit[:dy], rays_unit[:dz],
   rays_unit[:ndx], rays_unit[:ndy], rays_unit[:ndz],
-  
-  Arel::Nodes::As.new(hits_raw_manager_pow_x + hits_raw_manager_pow_y + hits_raw_manager_pow_z, Arel.sql("ha")),
-
+  Arel::Nodes::As.new(hits_raw_manager_pow_x_ha + hits_raw_manager_pow_y_ha + hits_raw_manager_pow_z_ha, Arel.sql("ha")),
+  Arel::Nodes::As.new(
+    Arel::Nodes::Multiplication.new(
+      Arel.sql("2.0"),
+      (
+        (rays_unit[:ox] - Arel.sql(Sphere.find_by(name: :big_sphere).position.x.to_s)) +
+        (rays_unit[:oy] - Arel.sql(Sphere.find_by(name: :big_sphere).position.y.to_s)) +
+        (rays_unit[:oz] - Arel.sql(Sphere.find_by(name: :big_sphere).position.z.to_s))
+      )
+    ),
+    Arel.sql("hb")
+  ),
+  Arel::Nodes::As.new(
+    (hits_raw_manager_pow_x_hc + hits_raw_manager_pow_y_hc + hits_raw_manager_pow_z_hc) - hits_raw_manager_pow_radius_hc,
+    Arel.sql("hc")
+  )
 )
 
-
-t = Arel::Nodes::Multiplication.new Arel.sql("0.5"),rays_unit[:dy] + Arel.sql("1.0")
+t = Arel::Nodes::Multiplication.new Arel.sql("0.5"), rays_unit[:dy] + Arel.sql("1.0")
 
 printf = Arel::Nodes::NamedFunction.new("PRINTF", [
   Arel.sql('"%i %i %i"'),
