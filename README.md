@@ -1,3 +1,6 @@
+> [!NOTE]  
+> I gave a talk about this at RailsConf 2024. Below is a small excerpt.
+
 # Raytraced rendering in ActiveRecord
 ![Render output](res/out.png)
 
